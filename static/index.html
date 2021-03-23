@@ -36,6 +36,7 @@ var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
 var wscounter = 0;
 var socket;
+var connected = false;
 
 // This will allow multiple users to draw without erasing seemingly random bits of each other's work
 // Also used with the server's listener system
@@ -172,8 +173,11 @@ function getPosition(e) {
 
 function addEntity(entity, data) {
     world[entity] = data;
-    drawNextFrame(); // (but should we?)
-    socket.send(JSON.stringify({"entity":entity, "data":data}))
+    drawNextFrame();
+
+    if (connected) {
+        socket.send(JSON.stringify({"entity":entity, "data":data}));
+    }
 }
 
 var counter = 0;
@@ -328,7 +332,11 @@ function wsSetup() {
     var url = "ws://"+host+"/subscribe";   
     socket = new WebSocket(url);
     socket.onopen = function() {
-        //XXX: TODO What are you going to do here?
+        // set connected flag and send anything that's happened while the socket was connecting
+        connected = true;
+        for (var key in world) {
+            socket.send(JSON.stringify({"entity":key, "data":world[key]}));
+        }
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -355,12 +363,8 @@ function wsSetup() {
 
 wsSetup();
 
-
-
-
 // 30 frames per second
 setInterval( update, 1000/30.0);
-
 
     </script>
 </body>
