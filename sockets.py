@@ -53,6 +53,7 @@ class World:
 
     def clear(self):
         self.space = dict()
+        self.set("clear", 1)
 
     def get(self, entity):
         return self.space.get(entity,dict())

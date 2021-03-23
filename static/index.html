@@ -336,12 +336,14 @@ function wsSetup() {
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            for (var key in msg.data) {
+            json = JSON.parse(msg.data);
+            for (var key in json) {
                 // If one client has cleared the world, all other clients should clear too
                 if (key == "clear") {
                     world = {};
                 } else {
-                    world[key] = msg.data[key];
+                    world[key] = json[key];
+                    debug(json[key]);
                 }
             }
             drawNextFrame();
