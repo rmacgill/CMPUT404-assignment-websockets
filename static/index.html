@@ -176,7 +176,7 @@ function addEntity(entity, data) {
     drawNextFrame();
 
     if (connected) {
-        socket.send(JSON.stringify({"entity":entity, "data":data}));
+        socket.send(JSON.stringify({key:world[key]}));
     }
 }
 
@@ -335,7 +335,7 @@ function wsSetup() {
         // set connected flag and send anything that's happened while the socket was connecting
         connected = true;
         for (var key in world) {
-            socket.send(JSON.stringify({"entity":key, "data":world[key]}));
+            socket.send(JSON.stringify({key:world[key]}));
         }
     };
     socket.onerror = function(msg) {

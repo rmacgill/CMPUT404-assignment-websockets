@@ -102,7 +102,8 @@ def read_ws(ws,client):
             msg = ws.receive()
             if (msg is not None):
                 packet = json.loads(msg)
-                myWorld.set(packet["entity"], packet["data"])
+                for key in packet.keys():
+                    myWorld.set(key, packet[key])
             else:
                 break
     except:
