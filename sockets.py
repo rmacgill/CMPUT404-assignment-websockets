@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 # Copyright (c) 2013-2014 Abram Hindle
+# Modifications copyright 2021 Robert MacGillivray
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -59,29 +60,69 @@ class World:
     def world(self):
         return self.space
 
-myWorld = World()        
+myWorld = World()
+
+
+# Taken from https://github.com/uofa-cmput404/cmput404-slides/blob/master/examples/WebSocketsExamples/chat.py
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
+
+
+clients = []
+
 
 def set_listener( entity, data ):
     ''' do something with the update ! '''
+    for client in clients:
+        client.put(json.dumps({entity:data}))
+
 
 myWorld.add_set_listener( set_listener )
         
 @app.route('/')
 def hello():
-    '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    """
+    Simple redirect to our HTML. Could probably also simply serve HTML from here instead.
+    """
+    return redirect("/static/index.html", code=302)
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
-    # XXX: TODO IMPLEMENT ME
-    return None
+    # Adapted from https://github.com/uofa-cmput404/cmput404-slides/blob/master/examples/WebSocketsExamples/chat.py
+    try:
+        while True:
+            msg = ws.receive()
+            if (msg is not None):
+                packet = json.loads(msg)
+                myWorld.set(packet["entity"], packet["data"])
+            else:
+                break
+    except:
+        '''Done'''
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
-    # XXX: TODO IMPLEMENT ME
-    return None
+    client = Client()
+    clients.append(client)
+    g = gevent.spawn(read_ws, ws, client)
+    try:
+        while True:
+            msg = client.get()
+            ws.send(msg)
+    except Exception as e:
+        print ("WS Error {}".format(e))
+    finally:
+        clients.remove(client)
+        gevent.kill(g)
 
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
@@ -98,24 +139,35 @@ def flask_post_json():
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
-    '''update the entities via this interface'''
-    return None
+    """
+    Updates the specified entity, and then returns the updated
+    JSON representation of that world entity (I'd rather not - but it's in the tests)
+    """
+    myWorld.set(entity, flask_post_json())
+    return jsonify(myWorld.get(entity))
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
-    '''you should probably return the world here'''
-    return None
+    """
+    Returns a JSON representation of the entire world
+    """
+    return jsonify(myWorld.world())
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
-    '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    """
+    Returns a JSON representation of a specific world entity
+    """
+    return jsonify(myWorld.get(entity))
 
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
-    '''Clear the world out!'''
-    return None
+    """
+    Clears the world, and then returns the cleared representation
+    """
+    myWorld.clear()
+    return jsonify(myWorld.world())
 
 
 

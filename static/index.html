@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width" />
     <meta name="license" content="
         Copyright 2013 Google, Abram Hindle
+        Modifications copyright 2021 Robert MacGillivray
         
         Licensed under the Apache License, Version 2.0 (the "License");
         you may not use this file except in compliance with the License.
@@ -36,6 +37,10 @@ var H = canvas.height = window.innerHeight-50;
 var wscounter = 0;
 var socket;
 
+// This will allow multiple users to draw without erasing seemingly random bits of each other's work
+// Also used with the server's listener system
+var randomID = Math.floor(Math.random() * 131313) + 1;
+
 function debug(str) {
     var debugDiv = document.getElementById('debug');
     debugDiv.innerHTML = "" + str;
@@ -59,14 +64,57 @@ function drawCircle(context,entity) {
     }
 }
 
-function prepEntity(entity) {
-    if (!entity["colour"]) {
-        entity["colour"] = "#FF0000";
+// Draw an ellipse instead so we can do more fun things
+function drawEllipse(context, entity) {
+    with(context) {
+        var x = entity["x"];
+        var y = entity["y"];
+        var radius = (entity["radius"])?entity["radius"]:13
+        var radiusX = (entity["radiusX"])?entity["radiusX"]:radius
+        var radiusY = (entity["radiusY"])?entity["radiusY"]:radius
+        
+        beginPath();
+        ellipse(x, y, radiusX, radiusY, 0, 0, 2.0 * Math.PI, false)
+        if (entity["fillColour"]) {
+            fillStyle = entity["fillColour"];
+            fill();
+        }
+        if (entity["strokeColour"]) {
+            lineWidth = 5;
+            strokeStyle = entity["strokeColour"];
+            stroke();
+        }
     }
-    if (!entity["radius"]) {
-        entity["radius"] = 50;
+}
+
+var currentR = 255;
+var currentG = 0;
+var currentB = 0;
+
+// Must be a factor of 255 because I'm lazy
+var progressRate = 15;
+
+function nextRainbowColour() {
+    if (currentR === 255 && currentG < 255 && currentB === 0) {
+        currentG += progressRate;
+    } else if (currentR > 0 && currentG === 255 && currentB === 0) {
+        currentR -= progressRate;
+    } else if (currentR === 0 && currentG === 255 && currentB < 255) {
+        currentB += progressRate;
+    } else if (currentR === 0 && currentG > 0 && currentB === 255) {
+        currentG -= progressRate;
+    } else if (currentR < 255 && currentG === 0 && currentB === 255) {
+        currentR += progressRate;
+    } else if (currentR === 255 && currentG === 0 && currentB > 0) {
+        currentB -= progressRate;
+    } else {
+        // This shouldn't happen. But we can reset just in case.
+        currentR = 255;
+        currentG = 0;
+        currentB = 0;
     }
-    return entity;
+
+    return "rgb(" + currentR + "," + currentG + "," + currentB + ")";
 }
 
 function clearFrame() {
@@ -83,11 +131,12 @@ function renderFrame() {
     clearFrame();
     for (var key in world) {
         var entity = world[key];
-        drawCircle(context,prepEntity(entity));
+        drawEllipse(context, entity);
     }
 }
 
 var drawNext = true;
+
 // Signals that there's something to be drawn
 function drawNextFrame() {
     drawNext = true;
@@ -124,11 +173,13 @@ function getPosition(e) {
 function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just modified!
+    socket.send(JSON.stringify({"entity":entity, "data",data}))
 }
+
 var counter = 0;
 function addEntityWithoutName(data) {
-    var name = "X"+(counter++)%100;
+    //var name = "X"+Math.floor((Math.random()*100)+1);
+    var name = randomID.toString() + "X" + ((counter++)%100);
     addEntity(name,data);
 }
 
@@ -229,22 +280,46 @@ mouse = (function() {
 })();
 
 // Add the application specific mouse listeners!
-//XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    addEntityWithoutName(
+        {
+            "x":x,
+            "y":y,
+            "radiusX":33,
+            "radiusY":100,
+            "strokeColour":"orange",
+            "fillColour":"grey"
+        }
+    );
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName(
+        {
+            "x":x,
+            "y":y,
+            "radiusX":33,
+            "radiusY":100,
+            "strokeColour":"aqua",
+            "fillColour":"grey"
+        }
+    );
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntityWithoutName(
+        {
+            "x":x,
+            "y":y,
+            "radius":13,
+            "fillColour":nextRainbowColour(),
+        }
+    );
 });
 
 
 function update() {
+    // Render the world if changes have been flagged
     drawFrame();
 }
 
@@ -261,7 +336,15 @@ function wsSetup() {
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            for (var key in msg.data) {
+                // If one client has cleared the world, all other clients should clear too
+                if (key == "clear") {
+                    world = {};
+                } else {
+                    world[key] = msg.data[key];
+                }
+            }
+            drawNextFrame();
         } catch (e) {
             alert("socket on message: " + e);
         }

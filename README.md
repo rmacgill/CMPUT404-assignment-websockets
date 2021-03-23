@@ -22,6 +22,8 @@ Contributors / Licensing
 
 Generally everything is LICENSE'D under the Apache 2 license by Abram Hindle.
 
+Modifications LICENSE'D under the Apache 2 license by Robert MacGillivray.
+
 freetests.py is LICENSE'D under a BSD-like license:
 
 From ws4py
