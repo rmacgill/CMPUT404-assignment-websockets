@@ -173,7 +173,7 @@ function getPosition(e) {
 function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
-    socket.send(JSON.stringify({"entity":entity, "data",data}))
+    socket.send(JSON.stringify({"entity":entity, "data":data}))
 }
 
 var counter = 0;
