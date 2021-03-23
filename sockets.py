@@ -29,7 +29,7 @@ app.debug = True
 
 class World:
     def __init__(self):
-        self.clear()
+        self.space = dict()
         # we've got listeners now!
         self.listeners = list()
         
