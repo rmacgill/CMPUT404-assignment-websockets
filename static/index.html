@@ -176,7 +176,7 @@ function addEntity(entity, data) {
     drawNextFrame();
 
     if (connected) {
-        socket.send(JSON.stringify({entity:data}));
+        socket.send(JSON.stringify({[entity]:data}));
     }
 }
 
